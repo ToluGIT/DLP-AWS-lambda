@@ -3,15 +3,13 @@ import boto3
 import logging
 from botocore.exceptions import ClientError
 
-# Initialize AWS clients
+
 s3 = boto3.client('s3')
 sns = boto3.client('sns')
 
-# Configuration
 DESTINATION_BUCKET_NAME = 'encrydlp303'
 SNS_TOPIC_ARN = 'arn:aws:sns:us-east-1:xxxxxxxx:dlp303'
 
-# Setup logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -19,12 +17,12 @@ def lambda_handler(event, context):
     logger.info(f"Received event: {json.dumps(event, indent=2)}")
     
     try:
-        # Extracting the 'detail' field from the event
+
         finding = event.get('detail', None)
         if not finding:
             raise KeyError("'detail' key not found in event.")
 
-        # Extract bucket and object information using ARN (more robust method)
+
         bucket_arn = finding['resourcesAffected']['s3Object']['bucketArn']
         source_bucket = bucket_arn.split(":::")[1]
         object_key = finding['resourcesAffected']['s3Object']['key']
@@ -32,10 +30,9 @@ def lambda_handler(event, context):
         
         logger.info(f"Sensitive data found in bucket {source_bucket}, file: {object_key} with severity {severity}")
         
-        # Remediate by moving the sensitive file
+
         move_sensitive_file(source_bucket, object_key)
         
-        # Send SNS notification
         message = (f"Sensitive data found and quarantined:\n"
                   f"Source Bucket: {source_bucket}\n"
                   f"File: {object_key}\n"
@@ -72,7 +69,6 @@ def lambda_handler(event, context):
 def move_sensitive_file(source_bucket, object_key):
     """Move the sensitive file to another bucket."""
     try:
-        # Copy the object to the destination bucket
         s3.copy_object(
             Bucket=DESTINATION_BUCKET_NAME,
             Key=object_key,
@@ -80,7 +76,6 @@ def move_sensitive_file(source_bucket, object_key):
         )
         logger.info(f"File {object_key} copied from bucket {source_bucket} to bucket {DESTINATION_BUCKET_NAME}.")
         
-        # Delete the object from the source bucket
         s3.delete_object(
             Bucket=source_bucket,
             Key=object_key
