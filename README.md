@@ -102,7 +102,7 @@ it takes a couple of minutes to complete the analysis, once done you can click o
 
 Now that we have identified the PII from the object files, we can automate post-action after detection.
 
-Before doing this, we need to set EventBridge and Lambda
+Before doing this, we need to configure SNS, EventBridge and Lambda.
 
 ## Step 3 - Configure SNS
 
@@ -153,7 +153,7 @@ On the following page, choose <kbd>Author from scratch</kbd>.
 
 Set the “Function name” to your preferred name. 
 
-Set the “Runtime” to <kbd>Python 3.12</kbd>. 
+Set the “Runtime” to <kbd>Python 3.13</kbd>. 
 
 ***********I used the Python runtime here. If another runtime is preferred, the code must be adjusted to meet the runtime's requirements.***********
 ***********Leave the remaining default settings; if an existing execution role is created, this can be used, or a new role with basic Lambda permissions is created by default***********
@@ -166,7 +166,6 @@ A code sample exists; modify it with the content as seen in the lambda_function.
 
 The following values will need to be changed depending on your current setup.
 
-**SOURCE_BUCKET_NAME** - The S3 bucket to be monitored for PII
 **DESTINATION_BUCKET_NAME** - The S3 bucket where the PII object will be moved 
 
 Once it's modified, then save it.
