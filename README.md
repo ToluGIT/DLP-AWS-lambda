@@ -1,4 +1,4 @@
-# AWS Data Loss Prevention (DLP) Implementation
+#  Data Loss Prevention (DLP) Implementation in AWS
 
 In this Project, we will be using AWS Macie to scan S3 for PII with post-action via EventBridge, Lambda and SNS to automate responses by moving identified PII files to an S3 bucket (with an additional layer of encryption)  and sending notifications to alert stakeholders about sensitive data activity.
 
@@ -27,6 +27,8 @@ CCV: 9723
 
 ```
 Other sample data can be used depending on the use case such as Employee information, License plates, and credential keys (AWS, Github and so on)
+
+I have included a Python script <kbd>dlp.py</kbd> to create random sample data for this use case.
 
 # Steps to follow 
 
