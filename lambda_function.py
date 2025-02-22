@@ -1,6 +1,6 @@
+import json
 import boto3
 import logging
-import os
 from botocore.exceptions import ClientError
 
 # Initialize AWS clients
@@ -8,64 +8,85 @@ s3 = boto3.client('s3')
 sns = boto3.client('sns')
 
 # Configuration
-SOURCE_BUCKET_NAME = 'sensitivebuck303'
-DESTINATION_BUCKET_NAME = 'encrytomac303'
-# SNS_TOPIC_ARN = 'arn:aws:sns:us-east-1:xxxxxxxxx:deployment-complete'
+DESTINATION_BUCKET_NAME = 'encrydlp303'
+SNS_TOPIC_ARN = 'arn:aws:sns:us-east-1:xxxxxxxx:dlp303'
 
 # Setup logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
-    # Print the full event to the logs for debugging
-    logger.info(f"Received event: {event}")
-
+    logger.info(f"Received event: {json.dumps(event, indent=2)}")
+    
     try:
         # Extracting the 'detail' field from the event
         finding = event.get('detail', None)
         if not finding:
             raise KeyError("'detail' key not found in event.")
 
+        # Extract bucket and object information using ARN (more robust method)
+        bucket_arn = finding['resourcesAffected']['s3Object']['bucketArn']
+        source_bucket = bucket_arn.split(":::")[1]
         object_key = finding['resourcesAffected']['s3Object']['key']
         severity = finding['severity']['description']
-
-        logger.info(f"Sensitive data found in: {object_key} with severity {severity}")
-
-        # Remediate by moving the sensitive file to another bucket
-        move_sensitive_file(object_key)
-
+        
+        logger.info(f"Sensitive data found in bucket {source_bucket}, file: {object_key} with severity {severity}")
+        
+        # Remediate by moving the sensitive file
+        move_sensitive_file(source_bucket, object_key)
+        
         # Send SNS notification
-        # message = f"Sensitive data found and moved to {DESTINATION_BUCKET_NAME}: {object_key}. Severity: {severity}"
-        # sns.publish(TopicArn=SNS_TOPIC_ARN, Message=message, Subject='Sensitive Data Alert')
-
+        message = (f"Sensitive data found and quarantined:\n"
+                  f"Source Bucket: {source_bucket}\n"
+                  f"File: {object_key}\n"
+                  f"Severity: {severity}\n"
+                  f"Moved to: {DESTINATION_BUCKET_NAME}")
+        
+        sns.publish(TopicArn=SNS_TOPIC_ARN, Message=message, Subject='Sensitive Data Alert')
         logger.info("Remediation and notification completed successfully.")
+        
+        return {
+            'statusCode': 200,
+            'body': json.dumps('Sensitive Data Remediation Completed Successfully')
+        }
+        
     except KeyError as e:
         logger.error(f"Error in processing Macie finding: {str(e)}")
-        raise
+        return {
+            'statusCode': 400,
+            'body': json.dumps(f'Error processing Macie finding: {str(e)}')
+        }
     except ClientError as e:
         logger.error(f"AWS client error: {str(e)}")
-        raise
+        return {
+            'statusCode': 500,
+            'body': json.dumps(f'AWS Service Error: {str(e)}')
+        }
     except Exception as e:
         logger.error(f"An unexpected error occurred: {str(e)}")
-        raise
+        return {
+            'statusCode': 500,
+            'body': json.dumps(f'Internal Server Error: {str(e)}')
+        }
 
-def move_sensitive_file(object_key):
+def move_sensitive_file(source_bucket, object_key):
     """Move the sensitive file to another bucket."""
     try:
         # Copy the object to the destination bucket
         s3.copy_object(
             Bucket=DESTINATION_BUCKET_NAME,
             Key=object_key,
-            CopySource={'Bucket': SOURCE_BUCKET_NAME, 'Key': object_key}
+            CopySource={'Bucket': source_bucket, 'Key': object_key}
         )
-        logger.info(f"File {object_key} copied to bucket {DESTINATION_BUCKET_NAME}.")
-
+        logger.info(f"File {object_key} copied from bucket {source_bucket} to bucket {DESTINATION_BUCKET_NAME}.")
+        
         # Delete the object from the source bucket
         s3.delete_object(
-            Bucket=SOURCE_BUCKET_NAME,
+            Bucket=source_bucket,
             Key=object_key
         )
-        logger.info(f"File {object_key} deleted from bucket {SOURCE_BUCKET_NAME}.")
+        logger.info(f"File {object_key} deleted from bucket {source_bucket}.")
+        
     except ClientError as e:
-        logger.error(f"Error moving file {object_key}: {str(e)}")
+        logger.error(f"Error moving file {object_key} from bucket {source_bucket}: {str(e)}")
         raise
